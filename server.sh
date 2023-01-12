@@ -1,5 +1,7 @@
 #!/bin/bash
 
+domain=$1
+has_ssl=$2
 
 #installing tools
 if [ "$EUID" -ne 0 ];then
@@ -22,53 +24,81 @@ sudo ufw status
 
 
 
-echo "▶ installing mysql ..."
 
-sudo apt -y install mysql-server
 
-echo "▶ secure mysql ..."
+ismysql=$(which mysql)
+
+
+
+if [[ $ismysql == "/usr/bin/mysql" ]]
+then
+    echo $ismysql
+else
+    echo "▶ installing mysql ..."
+    sudo apt -y install mysql-server
+    echo "▶ secure mysql ..."
+fi
+
+
 
 # sudo mysql_secure_installation
+isphp=$(which composer)
 
-echo "▶ installing php ..."
-apt-get install -y unzip
-apt-get install -y curl
+if [[ $isphp == "/usr/bin/php" ]]
+then
+    echo $isphp
+else
+    echo "▶ installing php ..."
+    apt-get install -y unzip
+    apt-get install -y curl
 
-apt-get -qq install -y  --no-install-recommends  \
-  php8.1-fpm \
-  certbot \
-  python3-certbot-nginx \
-  php-cli \
-  php-common \
-  php-bcmath \
-  php-curl \
-  php-gd \
-  php-imagick \
-  php-mbstring \
-  php-mysql \
-  php-opcache \
-  php-xml \
-  php-zip 
-    
 
-  echo "▶  php installed ..."
+    apt-get -qq install -y  --no-install-recommends  \
+      php8.1-fpm \
+      certbot \
+      python3-certbot-nginx \
+      php-cli \
+      php-common \
+      php-bcmath \
+      php-curl \
+      php-gd \
+      php-imagick \
+      php-mbstring \
+      php-mysql \
+      php-opcache \
+      php-xml \
+      php-zip 
+        
+
+      echo "▶  php installed ..."
+
+fi
+
+
+
 
 
 # sudo apt install php-cli unzip
 # sudo apt install php-mbstring
 
+iscomposer=$(which composer)
+
+
 export COMPOSER_ALLOW_SUPERUSER=1;
 
-cd ~
-curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
-HASH=`curl -sS https://composer.github.io/installer.sig`
-echo $HASH
-php -r "if (hash_file('SHA384', '/tmp/composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
-sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+if [[ $iscomposer == "/usr/local/bin/composer" ]]
+then
+    echo $iscomposer
+else
+    cd ~
+    curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+    HASH=`curl -sS https://composer.github.io/installer.sig`
+    echo $HASH
+    php -r "if (hash_file('SHA384', '/tmp/composer-setup.php') === '$HASH') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+    sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer 
+fi
 
 #ending install tools
-domain=$1
-user=$2
 
 
 domain_set_on_block=$domain
@@ -82,11 +112,15 @@ else
     subdomain=${domain:0:3}
     if [[ "$subdomain" == "www" ]]; then
         domain_set_on_block="${domain:4} $domain";
+        $domain = "${domain:4}"
     else
         domain_set_on_block=$domain;
+
     fi
 
 fi
+
+
 
 
 echo $domainExp;
@@ -96,6 +130,13 @@ echo "▶ domain name: $1";
 
 block="/etc/nginx/sites-available/$domain"
 domain_folder="/var/www/$domain"
+
+
+sudo chown -R "$USER":www-data domain_folder
+sudo chmod -R 0755 domain_folder
+
+
+
 domain_public_folder="$domain_folder/public"
 echo $domain_folder;
 #Create site dir
@@ -141,13 +182,48 @@ EOF
 
 
 
+
 #Link to make it available
-echo "▶ Linking Server Blocks"
 
 
 
 rm -rf /etc/nginx/sites-available/default
 rm -rf /etc/nginx/sites-enabled/default
+
+sudo ufw allow 'Nginx Full'
+sudo ufw allow 'Nginx HTTP'
+sudo ufw status
+sudo ufw allow OpenSSH
+sudo ufw allow ssh
+sudo ufw allow 22
+sudo ufw  -y enable
+
+if [[ "$has_ssl" == "ssl" ]]
+then
+    if [[ "$domain" == "main" ]]
+    then
+        echo "....."   
+    else
+        echo "▶ certbot"
+
+        if [[ "$subdomain" == "www" ]]; then
+            echo "domain and subdomain"
+            echo "certbot --nginx -d ${domain:4} -d $domain";
+
+            sudo certbot --nginx -d ${domain:4} -d $domain
+        else
+            echo "domain only"
+
+            sudo certbot --nginx -d $domain
+        fi
+        
+    fi
+
+    sudo systemctl status certbot.timer
+
+    sudo certbot renew --dry-run
+
+fi
 
 
 
@@ -165,7 +241,7 @@ echo "▶ php version ..."
 
 
 php -v
-composer -v
+composer --version
 
 
 echo "▶ server ip ..."
@@ -177,3 +253,10 @@ sudo tee $domain_public_folder/info.php > /dev/null <<EOF
 
 EOF
 
+
+sudo tee $domain_public_folder/index.php > /dev/null <<EOF
+    <?php
+    echo date("Y-m-d H:i:s",time());
+    echo "Hello World!";
+
+EOF
