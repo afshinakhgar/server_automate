@@ -48,29 +48,21 @@ if [[ $isphp == "/usr/bin/php" ]]
 then
     echo $isphp
 else
+
+    sudo apt install -y  ca-certificates apt-transport-https
+    sudo apt install -y  software-properties-common
+    sudo add-apt-repository ppa:ondrej/php
+
     echo "▶ installing php ..."
     apt-get install -y unzip
     apt-get install -y curl
 
+    sudo apt-get install -y php8.1 php8.1-fpm php8.1-cli php8.1-common php8.1-mysql php8.1-zip php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml php8.1-bcmath php8.1-zip
 
-    apt-get -qq install -y  --no-install-recommends  \
-      php8.1-fpm \
-      certbot \
-      python3-certbot-nginx \
-      php-cli \
-      php-common \
-      php-bcmath \
-      php-curl \
-      php-gd \
-      php-imagick \
-      php-mbstring \
-      php-mysql \
-      php-opcache \
-      php-xml \
-      php-zip 
+    sudo apt-get install -y certbot
         
 
-      echo "▶  php installed ..."
+    echo "▶  php installed ..."
 
 fi
 
